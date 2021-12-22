@@ -1132,11 +1132,15 @@ if not board.get("build.ldscript", ""):
         board.get(
             "build.esp-idf.ldscript",
             os.path.join(
-                FRAMEWORK_DIR, "components", idf_variant, "ld", "%s.ld" % idf_variant
+                FRAMEWORK_DIR, "components", "esp_system", "ld", idf_variant, "memory.ld.in"
             ),
         ),
         env.VerboseAction(
-            '$CC -I"$BUILD_DIR/config" -C -P -x  c -E $SOURCE -o $TARGET',
+            '$CC -I"$BUILD_DIR/config" -I"' +
+               os.path.join(FRAMEWORK_DIR, "components", "esp_system", "ld") +
+                '" -C -P -x  c -E $SOURCE -o $BUILD_DIR/memory.ld && cat $BUILD_DIR/memory.ld ' +
+               os.path.join(FRAMEWORK_DIR, "components", "esp_system", "ld", idf_variant, "sections.ld.in") +
+                ' > $TARGET',
             "Generating LD script $TARGET",
         ),
     )
@@ -1326,9 +1330,12 @@ libs = find_lib_deps(
 extra_flags = filter_args(link_args["LINKFLAGS"], ["-T", "-u"])
 link_args["LINKFLAGS"] = sorted(list(set(link_args["LINKFLAGS"]) - set(extra_flags)))
 
-# remove the main linker script flags '-T esp32_out.ld'
+# remove the main linker script flags '-T memory.ld -T sections.ld'
 try:
-    ld_index = extra_flags.index("%s_out.ld" % idf_variant)
+    ld_index = extra_flags.index("memory.ld")
+    extra_flags.pop(ld_index)
+    extra_flags.pop(ld_index - 1)
+    ld_index = extra_flags.index("sections.ld")
     extra_flags.pop(ld_index)
     extra_flags.pop(ld_index - 1)
 except:
