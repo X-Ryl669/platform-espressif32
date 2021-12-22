@@ -515,6 +515,72 @@ def generate_project_ld_script(sdk_config, ignore_targets=None):
     libraries_list = create_custom_libraries_list(
         os.path.join(BUILD_DIR, "ldgen_libraries"), ignore_targets
     )
+    # Rework the memory template linker script, following components/esp_system/ld.cmake
+    args = {
+        "preprocess" : os.path.join(
+            TOOLCHAIN_DIR,
+            "bin",
+            env.subst("$CC")),
+        "ld_output": os.path.join("$BUILD_DIR", "memory.ld"),
+        "ld_dir": os.path.join(FRAMEWORK_DIR,
+            "components",
+            "esp_system",
+            "ld",
+            idf_variant),
+        "ld_input": os.path.join(
+            FRAMEWORK_DIR,
+            "components",
+            "esp_system",
+            "ld",
+            idf_variant,
+            "memory.ld.in",
+        ),
+        "section_input": os.path.join(
+            FRAMEWORK_DIR,
+            "components",
+            "esp_system",
+            "ld",
+            idf_variant,
+            "sections.ld.in",
+        ),
+        "project_output": os.path.join("$BUILD_DIR", "%s.project.ld" % idf_variant),
+        "config": SDKCONFIG_PATH,
+        "flags" : '-C -P -x c -E -o ' 
+    }
+    
+    cmd = (
+        '"{preprocess}" {flags} "{ld_output}" -I "{config}" -I "{ld_dir}" "{ld_input}"'
+    ).format(**args)
+    
+    env.Command(
+        os.path.join("$BUILD_DIR", "memory.ld"),
+        os.path.join(
+            FRAMEWORK_DIR,
+            "components",
+            "esp_system",
+            "ld",
+            idf_variant,
+            "memory.ld.in",
+        ),
+        env.VerboseAction(cmd, "Generating memory linker script $TARGET"),
+    )
+
+    cmd = (
+        'cat "{ld_output}" "{section_input}" > "{project_output}"'
+    ).format(**args)
+
+    env.Command(
+        os.path.join("$BUILD_DIR", "%s.project.ld" % idf_variant),
+        os.path.join(
+            FRAMEWORK_DIR,
+            "components",
+            "esp_system",
+            "ld",
+            idf_variant,
+            "sections.ld.in",
+        ),
+        env.VerboseAction(cmd, "Generating project linker script $TARGET"),
+    )
 
     args = {
         "script": os.path.join(FRAMEWORK_DIR, "tools", "ldgen", "ldgen.py"),
@@ -539,13 +605,14 @@ def generate_project_ld_script(sdk_config, ignore_targets=None):
     ).format(**args)
 
     return env.Command(
-        os.path.join("$BUILD_DIR", "%s.project.ld" % idf_variant),
+        os.path.join("$BUILD_DIR", ".ld"),
         os.path.join(
             FRAMEWORK_DIR,
             "components",
-            idf_variant,
+            "esp_system",
             "ld",
-            "%s.project.ld.in" % idf_variant,
+            idf_variant,
+            "memory.ld.in",
         ),
         env.VerboseAction(cmd, "Generating project linker script $TARGET"),
     )
